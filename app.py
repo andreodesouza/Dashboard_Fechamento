@@ -253,7 +253,7 @@ def gerar_pdf(data_frame):
   )
   pdf.ln(10)
 
-  # 1. GERAL POR SQUAD (Robo x Humano com %)
+  # 1. GERAL POR SQUAD (Robô x Humano com %)
   pdf.set_font("helvetica", "B", 12)
   pdf.cell(0, 8, "1. Visao Geral por Squad (Robo x Humano)", ln=True)
   pdf.set_font("helvetica", "", 10)
@@ -284,11 +284,7 @@ def gerar_pdf(data_frame):
           ln=True,
       )
       pdf.set_font("helvetica", "", 10)
-      pdf.cell(
-          10,
-          6,
-          "",
-      )  # recuo
+      pdf.cell(10, 6, "")
       pdf.cell(
           0,
           6,
@@ -333,28 +329,22 @@ def gerar_pdf(data_frame):
         )
       pdf.ln(3)
 
-  # Retorna os bytes do PDF gerado
   return pdf.output()
 
 
-# --- BOTÃO PARA EXPORTAR PDF ---
-st.markdown("---")
+# --- BOTÃO DIRETO PARA EXPORTAR PDF NA BARRA LATERAL ---
 st.sidebar.markdown("---")
 st.sidebar.header("📥 Exportar Relatório")
 
-if st.sidebar.button("📄 Gerar e Baixar Relatório em PDF"):
-  with st.spinner("Gerando o relatório PDF..."):
-    pdf_bytes = gerar_pdf(df)
-    st.sidebar.download_button(
-        label="📥 Clique aqui para baixar o PDF",
-        data=pdf_bytes,
-        file_name=f"Relatorio_Squads_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-        mime="application/pdf",
-    )
-    st.success(
-        "✅ Relatório PDF gerado com sucesso! Clique no botão de download acima"
-        " na barra lateral."
-    )
+# Gera os bytes do PDF diretamente
+pdf_data = gerar_pdf(df)
+
+st.sidebar.download_button(
+    label="📄 Baixar Relatório em PDF",
+    data=pdf_data,
+    file_name=f"Relatorio_Squads_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+    mime="application/pdf",
+)
 
 
 # --- RESUMO POR SQUAD ---
@@ -376,7 +366,6 @@ if "_squad_geral" in df.columns:
       .reset_index()
   )
 
-  # Adiciona colunas de percentual
   resumo_squad["% Robô"] = (
       resumo_squad["Tratados_Robo"] / resumo_squad["Total_Tratados"] * 100
   ).round(1).astype(str) + "%"
