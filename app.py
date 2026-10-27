@@ -8,10 +8,10 @@ st.set_page_config(
     page_title="Dashboard Universal de Planilhas", page_icon="📊", layout="wide"
 )
 
-st.title("📊 Dashboard Universal - Squads & Automação")
+st.title("📊 Dashboard Universal - Squads, Filas & Automação")
 st.markdown(
-    "Painel com classificação automática por Squad e separação rigorosa entre"
-    " Robô e Humano."
+    "Painel interativo com filtros por Squad, Fila, Operador e separação Robô x"
+    " Humano."
 )
 
 # --- BOTÃO DE UPLOAD NA BARRA LATERAL ---
@@ -133,7 +133,7 @@ else:
   df["_squad_geral"] = "Retenção"
 
 
-# --- CLASSIFICAÇÃO ROBÔ vs HUMANO (ATUALIZADA) ---
+# --- CLASSIFICAÇÃO ROBÔ vs HUMANO ---
 def classificar_origem(valor):
   v = str(valor).strip()
   v_lower = v.lower()
@@ -141,7 +141,6 @@ def classificar_origem(valor):
   if v_lower == "" or v_lower == "nan" or v_lower == "none":
     return "Robô"
 
-  # Se o nome/registro começar com ou contiver termos típicos de robô/sistema/RPA/Plataforma/Refid/Port/Ativo
   termos_robo = [
       "ativo",
       "rpa",
@@ -154,11 +153,9 @@ def classificar_origem(valor):
   if any(termo in v_lower for termo in termos_robo):
     return "Robô"
 
-  # Se contiver '@' (estilo e-mail) ou for um nome humano válido, classifica como Humano
   if "@" in v or " " in v:
     return "Humano"
 
-  # Por padrão, se não caiu nas regras de robô e tem texto válido, é humano
   return "Humano"
 
 
@@ -172,6 +169,7 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("🔍 Filtros Dinâmicos")
 
+# 1. Filtro por Squad
 squads_disponiveis = sorted(df["_squad_geral"].unique().tolist())
 sel_squads = st.sidebar.multiselect(
     "Filtrar por Squad", squads_disponiveis, default=[]
@@ -179,12 +177,23 @@ sel_squads = st.sidebar.multiselect(
 if sel_squads:
   df = df[df["_squad_geral"].isin(sel_squads)]
 
+# 2. Filtro por Fila / Produto (Restaurado)
+if col_categoria in df.columns:
+  filas_disponiveis = sorted(df[col_categoria].dropna().unique().tolist())
+  sel_filas = st.sidebar.multiselect(
+      "Filtrar por Fila / Produto", filas_disponiveis, default=[]
+  )
+  if sel_filas:
+    df = df[df[col_categoria].isin(sel_filas)]
+
+# 3. Filtro por Operador
 if col_operador in df.columns:
   op_opts = sorted(df[col_operador].dropna().unique().tolist())
   sel_op = st.sidebar.multiselect(f"Filtrar por {col_operador}", op_opts)
   if sel_op:
     df = df[df[col_operador].isin(sel_op)]
 
+# 4. Filtro por Motivo / Status
 if col_descricao in df.columns:
   desc_opts = sorted(df[col_descricao].dropna().unique().tolist())
   sel_desc = st.sidebar.multiselect(f"Filtrar por {col_descricao}", desc_opts)
