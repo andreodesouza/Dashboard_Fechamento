@@ -329,14 +329,15 @@ def gerar_pdf(data_frame):
         )
       pdf.ln(3)
 
-  return pdf.output()
+  # Retorna em bytes corretos compatíveis com Streamlit
+  return pdf.output(dest="S").encode("latin1")
 
 
 # --- BOTÃO DIRETO PARA EXPORTAR PDF NA BARRA LATERAL ---
 st.sidebar.markdown("---")
 st.sidebar.header("📥 Exportar Relatório")
 
-# Gera os bytes do PDF diretamente
+# Gera os bytes do PDF
 pdf_data = gerar_pdf(df)
 
 st.sidebar.download_button(
