@@ -541,4 +541,8 @@ with col_g2:
       hole=0.4,
       template="plotly_dark",
   )
-  st.plotly_chart(fig_pie, use_container_width=
+  st.plotly_chart(fig_pie, use_container_width=True)
+
+# --- TABELA GERAL ---
+st.subheader("📋 Dados Detalhados")
+st.dataframe(df.head(100), use_container_width=True)
