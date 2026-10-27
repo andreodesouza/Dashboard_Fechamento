@@ -1,5 +1,7 @@
 from datetime import datetime
+import io
 import pandas as pd
+from fpdf import FPDF
 import plotly.express as px
 import streamlit as st
 
@@ -10,8 +12,8 @@ st.set_page_config(
 
 st.title("📊 Dashboard Universal - Squads, Filas & Automação")
 st.markdown(
-    "Painel interativo com filtros por Squad, Fila, Operador e separação Robô x"
-    " Humano."
+    "Painel interativo com filtros avançados, divisão Robô x Humano e exportação"
+    " em PDF."
 )
 
 # --- BOTÃO DE UPLOAD NA BARRA LATERAL ---
@@ -169,7 +171,6 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("🔍 Filtros Dinâmicos")
 
-# 1. Filtro por Squad
 squads_disponiveis = sorted(df["_squad_geral"].unique().tolist())
 sel_squads = st.sidebar.multiselect(
     "Filtrar por Squad", squads_disponiveis, default=[]
@@ -177,7 +178,6 @@ sel_squads = st.sidebar.multiselect(
 if sel_squads:
   df = df[df["_squad_geral"].isin(sel_squads)]
 
-# 2. Filtro por Fila / Produto (Restaurado)
 if col_categoria in df.columns:
   filas_disponiveis = sorted(df[col_categoria].dropna().unique().tolist())
   sel_filas = st.sidebar.multiselect(
@@ -186,14 +186,12 @@ if col_categoria in df.columns:
   if sel_filas:
     df = df[df[col_categoria].isin(sel_filas)]
 
-# 3. Filtro por Operador
 if col_operador in df.columns:
   op_opts = sorted(df[col_operador].dropna().unique().tolist())
   sel_op = st.sidebar.multiselect(f"Filtrar por {col_operador}", op_opts)
   if sel_op:
     df = df[df[col_operador].isin(sel_op)]
 
-# 4. Filtro por Motivo / Status
 if col_descricao in df.columns:
   desc_opts = sorted(df[col_descricao].dropna().unique().tolist())
   sel_desc = st.sidebar.multiselect(f"Filtrar por {col_descricao}", desc_opts)
@@ -236,6 +234,129 @@ col4.metric("Tratados por Humano", f"{total_humano:,}".replace(",", "."))
 st.markdown("---")
 
 
+# --- FUNÇÃO DE GERAÇÃO DE PDF ---
+def gerar_pdf(data_frame):
+  pdf = FPDF()
+  pdf.add_page()
+  pdf.set_auto_page_break(auto=True, margin=15)
+
+  # Cabeçalho
+  pdf.set_font("helvetica", "B", 16)
+  pdf.cell(0, 10, "Relatorio Executivo - Squads & Automacao", ln=True, align="C")
+  pdf.set_font("helvetica", "", 10)
+  pdf.cell(
+      0,
+      6,
+      f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+      ln=True,
+      align="C",
+  )
+  pdf.ln(10)
+
+  # 1. GERAL POR SQUAD (Robo x Humano com %)
+  pdf.set_font("helvetica", "B", 12)
+  pdf.cell(0, 8, "1. Visao Geral por Squad (Robo x Humano)", ln=True)
+  pdf.set_font("helvetica", "", 10)
+
+  if "_squad_geral" in data_frame.columns:
+    resumo_squad = (
+        data_frame.groupby("_squad_geral")
+        .agg(
+            Total=("_squad_geral", "count"),
+            Robo=("_tipo_tratamento", lambda x: (x == "Robô").sum()),
+            Humano=("_tipo_tratamento", lambda x: (x == "Humano").sum()),
+        )
+        .reset_index()
+    )
+
+    for _, row in resumo_squad.iterrows():
+      tot = row["Total"]
+      p_robo = (row["Robo"] / tot * 100) if tot > 0 else 0
+      p_humano = (row["Humano"] / tot * 100) if tot > 0 else 0
+
+      pdf.set_font("helvetica", "B", 10)
+      pdf.cell(
+          0,
+          6,
+          f"Squad: {row['_squad_geral']} (Total: {tot:,} tratados)".replace(
+              ",", "."
+          ),
+          ln=True,
+      )
+      pdf.set_font("helvetica", "", 10)
+      pdf.cell(
+          10,
+          6,
+          "",
+      )  # recuo
+      pdf.cell(
+          0,
+          6,
+          f"- Robo: {row['Robo']:,} ({p_robo:.1f}%)  |  Humano:"
+          f" {row['Humano']:,} ({p_humano:.1f}%)".replace(",", "."),
+          ln=True,
+      )
+  pdf.ln(5)
+
+  # 2. POR FILA (Discriminar cada operador e RPA)
+  pdf.set_font("helvetica", "B", 12)
+  pdf.cell(0, 8, "2. Detalhamento por Fila (Operadores e RPA)", ln=True)
+  pdf.set_font("helvetica", "", 10)
+
+  if (
+      col_categoria in data_frame.columns
+      and col_operador in data_frame.columns
+  ):
+    filas = sorted(data_frame[col_categoria].dropna().unique())
+    for fila in filas:
+      pdf.set_font("helvetica", "B", 10)
+      pdf.cell(0, 6, f"Fila / Produto: {fila}", ln=True)
+
+      df_fila = data_frame[data_frame[col_categoria] == fila]
+      operadores_fila = (
+          df_fila.groupby([col_operador, "_tipo_tratamento"])
+          .size()
+          .reset_index(name="Qtd")
+      )
+
+      pdf.set_font("helvetica", "", 9)
+      for _, op_row in operadores_fila.iterrows():
+        tipo_lbl = f"[{op_row['_tipo_tratamento']}]"
+        pdf.cell(10, 5, "")
+        pdf.cell(
+            0,
+            5,
+            f"{tipo_lbl} {op_row[col_operador]}: {op_row['Qtd']:,} tratados".replace(
+                ",", "."
+            ),
+            ln=True,
+        )
+      pdf.ln(3)
+
+  # Retorna os bytes do PDF gerado
+  return pdf.output(dest="S").encode("latin1")
+
+
+# --- BOTÃO PARA EXPORTAR PDF ---
+st.markdown("---")
+st.sidebar.markdown("---")
+st.sidebar.header("📥 Exportar Relatório")
+
+if st.sidebar.button("📄 Gerar e Baixar Relatório em PDF"):
+  with st.spinner("Gerando o relatório PDF..."):
+    pdf_bytes = gerar_pdf(df)
+    st.sidebar.download_button(
+        label="📥 Clique aqui para baixar o PDF",
+        data=pdf_bytes,
+        file_name=f"Relatorio_Squads_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+        mime="application/pdf",
+    )
+    st.success(
+        "✅ Relatório PDF gerado com sucesso! Clique no botão de download acima"
+        " na barra lateral."
+    )
+
+
 # --- RESUMO POR SQUAD ---
 st.subheader("🏢 Resumo Consolidado por Squad (Tratados, Robô e Humano)")
 if "_squad_geral" in df.columns:
@@ -254,11 +375,22 @@ if "_squad_geral" in df.columns:
       )
       .reset_index()
   )
+
+  # Adiciona colunas de percentual
+  resumo_squad["% Robô"] = (
+      resumo_squad["Tratados_Robo"] / resumo_squad["Total_Tratados"] * 100
+  ).round(1).astype(str) + "%"
+  resumo_squad["% Humano"] = (
+      resumo_squad["Tratados_Humano"] / resumo_squad["Total_Tratados"] * 100
+  ).round(1).astype(str) + "%"
+
   resumo_squad.columns = [
       "Squad",
       "Total Tratados",
       "Tratados por Robô",
       "Tratados por Humano",
+      "% Robô",
+      "% Humano",
   ]
   st.dataframe(resumo_squad, use_container_width=True, hide_index=True)
 
