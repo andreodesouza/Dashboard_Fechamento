@@ -234,7 +234,7 @@ col4.metric("Tratados por Humano", f"{total_humano:,}".replace(",", "."))
 st.markdown("---")
 
 
-# --- FUNÇÃO DE GERAÇÃO DE PDF ---
+# --- FUNÇÃO DE GERAÇÃO DE PDF (10% ROBUSTA E COMPATÍVEL) ---
 def gerar_pdf(data_frame):
   pdf = FPDF()
   pdf.add_page()
@@ -329,15 +329,17 @@ def gerar_pdf(data_frame):
         )
       pdf.ln(3)
 
-  # Retorna em bytes corretos compatíveis com Streamlit
-  return pdf.output(dest="S").encode("latin1")
+  # Saída robusta compatível com qualquer versão do FPDF
+  output_res = pdf.output()
+  if isinstance(output_res, str):
+    return output_res.encode("latin1")
+  return bytes(output_res)
 
 
 # --- BOTÃO DIRETO PARA EXPORTAR PDF NA BARRA LATERAL ---
 st.sidebar.markdown("---")
 st.sidebar.header("📥 Exportar Relatório")
 
-# Gera os bytes do PDF
 pdf_data = gerar_pdf(df)
 
 st.sidebar.download_button(
