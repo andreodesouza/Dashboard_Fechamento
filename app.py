@@ -334,7 +334,7 @@ def gerar_pdf(data_frame):
       pdf.ln(3)
 
   # Retorna os bytes do PDF gerado
-  return pdf.output(dest="S").encode("latin1")
+  return pdf.output()
 
 
 # --- BOTÃO PARA EXPORTAR PDF ---
